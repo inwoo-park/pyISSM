@@ -7,6 +7,8 @@ This module contains functions to compute geometric properties on ISSM model mes
 import warnings
 import numpy as np
 from pyissm import model
+from pyissm.model.classes import friction
+from pyissm.tools.interp import averaging
 
 
 def slope(md, field = None):
@@ -134,6 +136,78 @@ def nowicki_profile(x):
 
     return b, h, sea
 
+def basalstress(md): # {{{
+    """
+    Computes basal stress from basal sliding parametrization in md.friction and
+    geometry and ice velocity in md.initialization. Follows the basal stress
+    definition in "src/c/classes/Loads/Friction.cpp", lines 1102-1136.
+
+    Parameters
+    ----------
+    md : object
+        ISSM model object
+
+    Returns
+    -------
+    bx, by : ndarray
+        x,y component of basal stress
+    b : ndarray
+        scalar magnitude of basal stress
+    """
+
+    # compute sliding velocity
+    ub=np.sqrt(md.initialization.vx**2+md.initialization.vy**2)/md.constants.yts
+    ubx=md.initialization.vx/md.constants.yts
+    uby=md.initialization.vy/md.constants.yts
+
+    # coerce 1-D array
+    ub  =np.ravel(ub)
+    ubx =np.ravel(ubx)
+    uby =np.ravel(uby)
+
+    #compute basal drag (S.I.)
+    if isinstance(md.friction,friction.default):
+        # calculate effective pressure using coupling definition in md.friction
+        N = effectivepressure(md) # effective pressure (Pa)
+
+        # compute exponents
+        s=averaging(md,1/md.friction.p,0)
+        r=averaging(md,md.friction.q/md.friction.p,0)
+        coefficient=np.ravel(md.friction.coefficient)
+
+        # coerce 1-D array
+        r =np.ravel(r)
+        s =np.ravel(s)
+
+        alpha2 = (N**r)*(md.friction.coefficient**2)*(ub**(s-1))
+    elif isinstance(md.friction,friction.schoof):
+        # calculate effective pressure using coupling definition in md.friction
+        N = effectivepressure(md) # effective pressure (Pa)
+
+        # compute parameters
+        m=averaging(md,md.friction.m,0)
+        C=averaging(md,md.friction.C,0)
+        Cmax=averaging(md,md.friction.Cmax,0)
+
+        alpha2 = (C**2 * ub**(m-1))/(1 + (C**2/(Cmax*N))**(1/m)*ub)**m
+        pos = np.where((ub < 1e-10) | (N <= 0.))[0]
+        alpha2[pos] = 0
+
+    elif isinstance(md.friction,friction.weertman):
+        m = averaging(md,md.friction.m,0.0)
+        C = md.friction.C
+        alpha2 = C**2 * ub**(1/m-1)
+
+    else:
+        raise Exception('not supported yet')
+
+    b  =  alpha2*ub
+    bx = -alpha2*ubx
+    by = -alpha2*uby
+
+    #return magnitude of only one output is requested
+    return bx, by, b
+    # }}}
 
 def effectivepressure(md, head=None):
     """
