@@ -288,8 +288,7 @@ def arrhenius(temperature, pressure, waterfraction = None, n=3):
         raise RuntimeError('Currently the only supperted values for n are 3 or 4.')
 
     if waterfraction is None:
-        if np.isnan(waterfraction):
-            waterfraction = np.zeros(temperature.shape)
+        waterfraction = np.zeros(temperature.shape)
     else:
         # Some check consistency
         if any(waterfraction<0):
