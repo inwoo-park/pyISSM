@@ -237,7 +237,7 @@ def nye(temperature, ice_type):
 
     return rigidity
 
-def arrhenius(temperature, pressure, waterfraction = None, n=3):
+def arrhenius(temperature, pressure, waterfraction = np.nan, n=3):
     """
     ARRHENIUS - calculate the rigidity of ice for a given temperature, pressure and waterfraction.
     
@@ -287,7 +287,8 @@ def arrhenius(temperature, pressure, waterfraction = None, n=3):
     if n not in [3,4]:
         raise RuntimeError('Currently the only supperted values for n are 3 or 4.')
 
-    if waterfraction is None:
+    if np.isnan(waterfraction):
+        # Set default value.
         waterfraction = np.zeros(temperature.shape)
     else:
         # Some check consistency
